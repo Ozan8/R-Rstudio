@@ -1,0 +1,323 @@
+---
+title: "Untitled"
+author: "Ozan Kepir"
+date: "11/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(visdat)
+library(moments)
+library(ggcorrplot)
+library(Hmisc)
+library(car)
+library(palmerpenguins)
+movies <- read_csv("./Data/movies.csv")
+bechdel <- read_csv("./Data/bechdel.csv")
+```
+```{r}
+get_modes <- function(x) {
+  ux <- unique(x)
+  tab <- tabulate(match(x, ux));
+  ux[tab == max(tab)]
+}
+```
+
+
+# ---------- Basic R functions ---------
+
+## Exercise
+
+Compute your own age using the method above.
+
+```{r}
+current_year <- 2021
+birthday <- 1991
+age <- (current_year - birthday)
+print(age)
+```
+
+You pay participants 8€ per hour. You normally have about 300 participants per week. The duration of the experiments varies between 15min, 30min, and sometimes 45min. Also, your research assistants' salaries amount to 100€ per week. Write an algorithm to estimate weekly experiment costs where duration is an object whose value can be changed.
+
+```{r}
+duration <- 30
+cost = (((duration/60) * 8 * 300) + 100)
+print(cost)
+```
+## Exercise
+
+Compute our height if we were 7cm shorter.
+
+```{r}
+height <- c(1.82, 1.69, 1.68, 1.91, 1.54, 1.63)
+height - 0.07
+print(height)
+
+```
+
+This is the formula for the Body-Mass-Index BMI = bodymass / height^2
+Generate a vector with the BMI values based on the following mass and height vectors.
+
+```{r}
+bodymass <- c(72, 63, 55, 89, 40)
+height2 <- c(1.8, 1.5, 1.6, 1.9, 1.3)
+BMI <- (bodymass/height2^2)
+print(BMI)
+```
+
+You want to measure how well people could follow a lecture. Among other questions, participants have to indicate their agreement from 1 (not at all) to 7 (very much) to the statement "I did not understand anything." You now want to recode the answers of your participants so that higher values indicate better understanding. Please recode the following vector: answers <- c(1,4,5,3,7,2,5,3,6,2,4,5,3,6,7,1)
+
+```{r}
+answers <- c(1,4,5,3,7,2,5,3,6,2,4,5,3,6,7,1)
+new_answers <- (8 - answers)
+print(new_answers)
+
+```
+
+
+
+# ----------- Data preparation 1 ----------
+
+## Exercise
+
+Determine what the variable (column) names in the "bechdel" data set are.
+
+```{r}
+colnames(bechdel)
+```
+
+How many rows does the bechdel data set have?
+
+```{r}
+ncol(bechdel)
+```
+
+Visualize the bechdel data set
+
+```{r}
+vis_dat(bechdel)
+```
+# -----------------Data preparation 2 ---------
+
+## Exercise
+
+Keep only movies that were released after 2010. How many observations do you have?
+
+```{r}
+filter(movies, release_date >2010) %>% 
+  nrow()
+```
+
+Keep only rows where the PG rating is "PG-13" and which belong to the "Comedy", "Horror", or "Drama" genre.
+
+```{r}
+filter(movies, (mpaa_rating == "PG-13" & genre == c("Comedy","Horror", "Drama")))
+```
+## Exercise
+
+Move the genre column to the front.
+
+```{r}
+select(movies, genre, everything())
+```
+
+Select all columns in the bechdel data set that measure movie budget.
+
+```{r}
+select(bechdel, contains("budget"))
+```
+
+Remove all columns from the bechdel data set that indicate values adjusted to 2013 prices.
+
+```{r}
+select(bechdel, -ends_with("2013"))
+```
+
+## Exercise
+Create a column for the bechdel data set that computes how old the movies are (think about last week's session to compute our ages for inspiration). Move that column to the front of the data set.
+
+
+```{r}
+mutate(.data = bechdel,how_old = (2021-bechdel$year)) %>% 
+  select(how_old,everything())
+```
+
+Compute the overall boxoffice success adjusted to 2013 prices (made up of domgross_2013 and intgross_2013) for each movie in the bechdel data set.
+
+```{r}
+mutate(.data = bechdel, overall = domgross_2013 + intgross_2013) %>% 
+  select(overall,everything())
+```
+
+Create a column called "pass" that says TRUE when the "clean_test" variable for an observation is "ok" and FALSE when the variable is anything else. THink of the logical operators that were introduced above.
+
+```{r}
+mutate(bechdel, pass= clean_test == "ok") %>% 
+  select(pass,everything())
+```
+
+## Exercise
+
+Filter only movies between 2010 and 2013 and look at the average domestic gross per year and genre (input both variables in the group_by-function at the same time).
+
+```{r}
+filter(movies, release_date >= 2010 & release_date <= 2013) %>%
+  group_by(release_date, genre) %>% 
+  summarise(mean(domestic_gross))
+```
+
+Compute the overall returns of movies per year starting 1990
+
+```{r}
+filter(.data = movies, release_date >= 1990) %>% 
+  mutate(overall_returns = domestic_gross + worldwide_gross) %>% 
+  select(overall_returns, everything())
+```
+# ---------- Data visualization --------
+```{r}
+movies <- drop_na(movies)
+```
+
+##EXERCISE 
+Create a barplot to see how many movies are in each genre. 
+```{r}
+ggplot(data = movies,mapping = aes(x = genre))+
+  geom_bar()
+```
+
+## EXERCISE 
+Create a histogram of worldwide gross earnings. Try changing the number of bins to see how the plot changes:
+
+```{r}
+ggplot(data = movies,mapping = aes(x = worldwide_gross, bins = 100)) +
+  geom_histogram()
+```
+##EXERCISE 
+Create a boxplot of the worldwide gross earnings by mpaa rating:
+
+```{r}
+ggplot(data = movies,mapping = aes(x = worldwide_gross,y = mpaa_rating)) +
+  geom_boxplot() 
+```
+##EXERCISE 
+Create a new dataset only keeping movies distributed by Walt Disney, Warner Bros., Universal & Sony Pictures
+
+```{r}
+ndf <- filter(movies, distributor == c("Sony Pictures", "Walt Disney", "Sony Pictures", "Warner Bros."))
+```
+
+Check that it worked
+```{r}
+ggplot(data = ndf, mapping = aes(x = distributor))+
+  geom_bar()
+```
+
+Create a barplot grid using facet wrap to look at the frequency of genres for each distributor
+
+```{r}
+ggplot(data = ndf, mapping = aes(x = genre)) +
+  geom_bar() +
+  facet_wrap(~distributor)
+```
+
+Create a juxtaposed barplot to show the frequency of mpaa_rating for each distributor:
+
+```{r}
+ggplot(data = ndf,mapping = aes(x = distributor, fill = mpaa_rating))+
+  geom_bar(position = "dodge")
+```
+#-------------Descriptive Statistics
+## EXERCISE
+
+Compute the mean, median and mode of production budget per genre
+Tip: Use the "group_by" and "summarise" functions learned in the previous sessions.
+
+```{r}
+drop_na(movies) %>% 
+  group_by(genre) %>%
+  summarise(mean(movies$production_budget),median(movies$production_budget), get_modes(movies$production_budget))
+```
+## EXERCISE
+Think back to the data visualization session. How could we visually represent the range and quartiles of production budget. Plot this graph.
+```{r}
+ggplot(data = movies, aes(x = production_budget)) + 
+  geom_boxplot()
+  
+```
+## EXERCISE:
+
+```{r}
+bechdel <- bechdel %>% 
+  drop_na()
+```
+
+Calculate the means and the standard deviations of `metascore` for each decade ("decade_code") represented in the data set. The decades are coded as:
+
+1 = 1990 - 1999
+2 = 2000 - 2009
+3 = 2010 - 2019
+
+1) Which decade has the highest degree of dispersion in metascore according to the different measures?
+
+```{r}
+group_by(bechdel, decade_code) %>% 
+  summarise(mean(metascore), sd(metascore))
+```
+
+2) Graph the overall metascore in a density plot, including vertical lines for mean and standard deviation:
+
+```{r}
+sd <- sd(bechdel$metascore)
+mean <- mean(bechdel$metascore)
+ggplot(data = bechdel,mapping = aes(x =metascore)) + 
+  geom_density() + 
+  geom_vline(xintercept = mean, color = "red") + 
+  geom_vline(aes(xintercept = mean + sd), color = "blue") +
+  geom_vline(aes(xintercept = mean - sd), color = "blue")
+```
+
+
+##EXERCISE
+
+Before we calculate the numerical value, let's  have another look at the density plot for production budget. What degree of skewness could we expect here, and in which direction?
+
+Now calculate skewness of production budget:
+
+```{r}
+skewness(movies$production_budget)
+```
+
+Let's do the same for the metascore variable from the bechdel dataset. First look at the density plot and try to estimate the skewness. Then calculate it.
+
+```{r}
+ggplot(data = bechdel,mapping = aes(x = metascore)) + 
+  geom_density()
+skewness(bechdel$metascore)
+```
+# EXERCISE
+
+How would we represent this correlation visually? Use ggplot. 
+
+```{r}
+ggplot(data = movies, aes (x = production_budget, y = worldwide_gross)) + 
+  geom_point(color = "red") + 
+  geom_smooth(method = "lm")
+```
+#EXERCISE
+
+Create a new dataset with only the genres Comedy and Horror
+
+
+```{r}
+df2 <- movies %>% 
+  filter(genre == "Comedy" | genre == "Horror")
+```
+
+Is there a signficant difference in the domestic gross earnings of comedy and horror movies?
+
+```{r}
+leveneTest(domestic_gross ~ as.factor(genre),data = df2, center = "mean")
+t.test(domestic_gross ~as.factor(genre),data = df2)
+```
