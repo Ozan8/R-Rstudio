@@ -1,0 +1,275 @@
+---
+title: "Untitled"
+output: github_document
+---
+
+```{r setup}
+library(tidyverse)
+library(visdat)
+library(moments)
+library(ggcorrplot)
+library(Hmisc)
+library(car)
+library(palmerpenguins)
+
+
+Sys.setenv(LANG = "en")
+```
+
+# TODAY'S TOPICS - (Mostly) Inferential Statistics
+
+## Relationships between variables
+### Correlations
+### Visualizing correlations
+
+## Differences between groups
+### t-tests
+### ANOVA
+
+```{r}
+df <- read_csv(file = "./Data/movies.csv")
+```
+
+Let's drop the cases with missing data
+
+```{r}
+df <- df %>% 
+  drop_na()
+```
+
+
+# Correlations
+
+While not technically inferential, correlations are commonly done as a "first step" before using inferential analyses, to get a rough idea of how our variables are related. 
+
+Correlations between two variables are quite simple to calculate in R
+
+
+What is the correlation between production budget and worldwide gross earnings?
+```{r}
+cor(df$production_budget,df$worldwide_gross)
+
+```
+
+# EXERCISE
+
+How would we represent this correlation visually? Use ggplot. 
+
+```{r}
+ggplot(data = df, aes (x = production_budget, y = worldwide_gross)) + 
+  geom_point(color = "red") + 
+  geom_smooth(method = "lm")
+```
+
+However, usually we don't just want to know the correlation between two variables, but want to know how all the numerical variables in our dataset correlate with each other. 
+What if we want to look at a correlation matrix?
+
+First let's create a couple of new variables. Create a variable that represents only the international gross earnings (so the worldwide gross - the domestic gross)
+```{r}
+df <- df %>% 
+  mutate(international_gross = worldwide_gross - domestic_gross)
+```
+
+Now create a variable that represents the profit made (worldwide) from each movie:
+```{r}
+df <- df %>% 
+  mutate(profit = worldwide_gross - production_budget)
+```
+
+Correlations can only be done with numerical variables. Let's select only our numerical variables in a separate dataframe:
+```{r}
+
+```
+
+There are a couple of different ways to look at correlation matrices in R. One of the most simple ones is using the "cor" function
+```{r}
+num_vars <- select_if(df, is.numeric)
+corrmat <- cor(num_vars)
+corrmat
+```
+
+We can separately calculate the p-values of our correlations using the cor_pmat function:
+```{r}
+pmat <- cor_pmat(num_vars)
+pmat
+```
+
+Alternatively, we can use the "rcorr" function from the Hmisc package to get a matrix of correlations as well as p-values:
+
+```{r}
+
+```
+
+We can also represent correlation matrices visually. One way is using a pairs plot, which creates a scatterplot for each combination of variables:
+
+```{r}
+pairs(num_vars)
+  ```
+Another cool way to do this is using a correlation heat map from the ggcorrplot package:
+
+```{r}
+ggcorrplot(corrmat,
+           type = "lower",
+           hc.order = TRUE,
+           lab = TRUE,
+           digits = 2,
+           p.mat = pmat,
+           insig = "blank")
+```
+# Analyzing differences between groups
+
+## Differences between two groups
+
+Let's say we want to know if there is a significant difference in how much action movies and adventure movies make worldwide.
+
+First let's make a new data set that only includes Action or Adventure movies:
+```{r}
+df2 <- df %>% 
+  filter(genre == "Action" | genre == "Adventure")
+```
+
+Now let's just have a look at the overall means for each genre:
+```{r}
+df2 %>% 
+  group_by(genre) %>% 
+  summarise(Mean = mean(worldwide_gross))
+
+```
+
+That gives us some idea, but we want to know if this difference between the two groups is statistically significant. To do this, we need to perform an independent samples t-test.
+
+### Independent Samples t-tests
+t-tests have certain assumptions. One of the main ones is Homogeneity of variance: that the two groups are assumed to have equal variance. We can test for this using a statistical test called Levene's test.
+
+### Test for Homogeneity of Variance: Levene's test
+
+```{r}
+leveneTest(worldwide_gross ~ as.factor(genre), data = df2, center = "mean")
+```
+
+Population variances are not equal if “Sig.” or p < 0.05.
+
+HOWEVER: 
+
+- Homogeneity of variance is quite rare in real data.
+- Levene's test is generally quite underpowered to detect small variance differences. This means that in many instances, it will not show a significant result and will make you wrongly assume homogeneity of variance when there actually are variance differences in the population.
+
+A classical t-test performs poorly when homogeneity of variance is not assumed and/or the size of the groups differ.
+Many researchers recommend using Welch's t-test (non-parametric) which is less affected by these issues (Delacre et al., 2017).
+
+Welch's t-test is the default option in the t.test() function, you just do not have to specify var.equal or set it to FALSE
+
+```{r}
+t.test(worldwide_gross ~as.factor(genre), data = df2)
+```
+
+How can we interpret the results of this t-test?
+
+There are other types of t-tests as well:
+
+
+- One sample t-test: Mean comparison between a sample and an assumed population mean
+- Paired sample t-test: Mean comparison between two repeated measures from the same group
+
+#EXERCISE
+
+Create a new dataset with only the genres Comedy and Horror
+
+```{r}
+df3 <- df %>% 
+  filter(genre == "Comedy" | genre == "Horror")
+```
+
+Is there a signficant difference in the domestic gross earnings of comedy and horror movies?
+
+```{r}
+leveneTest(domestic_gross ~ as.factor(genre),data = df3, center = "mean")
+t.test(domestic_gross ~as.factor(genre),data = df3)
+```
+
+### Differences between multiple groups
+
+t-tests can only test for differences between two groups. But what if we wanted to compare means of three or more groups?
+
+One solution could be to do multiple t-tests. However, this presents a major problem. Does anyone know what it is? 
+
+ 
+
+Now let's use a dataset that is already predownloaded into R, the penguin data set:
+
+```{r}
+dat <- penguins
+```
+
+Let's have a look at the data:
+```{r}
+
+```
+
+
+Let's say we want to answer the question: Are flippers length different for the 3 species of penguins?
+
+ANOVA also requires certain assumptions to be met. One of those is the assumption of normality, that our residuals are normally distributed. We can check that as follows:
+
+First we compute the ANOVA model:
+```{r}
+
+```
+
+Now we can visually check normality using a histogram:
+
+```{r}
+
+```
+
+and a Q-Q plot:
+```{r}
+
+
+```
+ANOVA also assumes homogeneity of variance, and we can test this using the same diagnostic test we used for the t-test:
+
+#EXERCISE
+
+Check the assumption of homogeneity of variance for the previous ANOVA example and interpret the results
+```{r}
+
+```
+
+Now we can inspect our ANOVA results
+
+```{r}
+
+```
+Given that the p-value is smaller than 0.05, we reject the null hypothesis, so we reject the hypothesis that all means are equal. Therefore, we can conclude that at least one species is different than the others in terms of flippers length.
+
+But WHICH species differ?
+
+## Post Hoc Tests
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+#EXERCISE
+Using the movies dataset, filter the data to only include movies rated PG, PG-13 and R
+
+```{r}
+df %>% 
+  filter(mpaa_rating == c("PG","PG-13", "R"))
+```
+
+Assume all assumptions are met. Compute an ANOVA model comparing the domestic gross earnings for each of the three mpaa rating categories:
+```{r}
+
+```
+If the results are significant, use a post-hoc test to check where the specific differences are:
+
+```{r}
+
+```
+
